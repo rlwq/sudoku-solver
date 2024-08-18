@@ -119,7 +119,7 @@ std::list<matrix<cell>> solutions(matrix<choice<cell>>& m, size_t d) {
 
 int main (int argc, char *argv[]) {
   if (argc != 2) {
-    std::cout << "Usage: " << argv[0] << " filename" << std::endl;
+    std::cout << "Usage: " << argv[0] << " <filename>" << std::endl;
     return 0;
   }
   std::ifstream grid_file(argv[1]);
