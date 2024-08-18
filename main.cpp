@@ -118,21 +118,44 @@ std::list<matrix<cell>> solutions(matrix<choice<cell>>& m, size_t d) {
 }
 
 int main (int argc, char *argv[]) {
-  if (argc != 2) {
+  std::string output_filename = "result.txt";
+  if (argc == 1) {
     std::cout << "Usage: " << argv[0] << " <filename>" << std::endl;
+    std::cout << "    -o <filename> | specifices output file." << std::endl;
     return 0;
   }
-  std::ifstream grid_file(argv[1]);
-  
+
+  for (size_t i = 2; i < argc; i++) {
+    if (argv[i][0] != '-') {
+      std::cout << "Unexpected parameter '" << argv[i] << "'. Run '" << argv[0] << "' for help." << std::endl;
+      return 0;
+    }
+
+    switch (argv[i][1]) {
+      case 'o': output_filename = argv[++i]; break;
+
+      default:
+        std::cout << "Unexpected flag '" << argv[i][0] << "'. Run '" << argv[0] << "' for help." << std::endl;
+    }
+    
+
+  }
+
+  std::ifstream input_file(argv[1]);
+  if (!input_file.good()) {
+    std::cout << "Can't access file '" << argv[1] << "'." << std::endl;
+    return 0;
+  }
+
   size_t d = 3;
   matrix<choice<cell>> grid = generate_choice_matrix(d);
   
   for (int i = 0; i < d * d; i++)
     for (int j = 0; j < d * d; j++) {
-      char c; grid_file >> c;
+      char c; input_file >> c;
       if (c != '.') determine(grid, j, i, c - '1' + 1, d);
     }
-  grid_file.close();
+  input_file.close();
 
   auto begin_time = std::chrono::high_resolution_clock::now();
   auto sols = solutions(grid, d);
@@ -140,7 +163,7 @@ int main (int argc, char *argv[]) {
   std::chrono::duration<double> calc_time = end_time - begin_time;
   
   // save to file
-  std::ofstream results("result.txt");
+  std::ofstream results(output_filename);
   for (auto &dd : sols) {
     for (int i = 0; i < d*d; i++) {
       for (int j = 0; j < d*d; j++)
