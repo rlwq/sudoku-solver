@@ -7,7 +7,7 @@ $ g++ main.cpp -o solver
 ```
 # Usage
 ```console
-$ solver <output_filename> [flags]
+$ solver <input_filename> [flags]
 ```
 ### Flags:
 
