@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iomanip>
 #include <vector>
 #include <list>
 #include <fstream>
@@ -98,12 +99,12 @@ choice<matrix<choice<cell>>> determine_first(matrix<choice<cell>>& m, size_t d) 
   return {};
 }
 
-std::list<matrix<cell>> solutions(matrix<choice<cell>>& m, size_t d) {
+std::list<matrix<cell>> get_solutions(matrix<choice<cell>>& m, size_t d, size_t solution_count_limit) {
   std::list<matrix<cell>> result;
 
   std::list<matrix<choice<cell>>> stack = {m};
 
-  while (!stack.empty()) {
+  while (!stack.empty() && (solution_count_limit == 0 || result.size() < solution_count_limit)) {
     matrix<choice<cell>> ch = stack.front();
     stack.pop_front();
     int status = grid_status(ch);
@@ -117,12 +118,31 @@ std::list<matrix<cell>> solutions(matrix<choice<cell>>& m, size_t d) {
   return result;
 }
 
+cell parse_cell (char c) {
+  if ('1' <= c && c <= '9') return c - '0';
+  if ('a' <= c && c <= 'z') return 10 + c - 'a';
+  if ('A' <= c && c <= 'Z') return 36 + c - 'A';
+  return 0;
+}
+
+char write_cell (cell c) {
+  if ( 1 <= c && c <=  9) return c + '0';
+  if (10 <= c && c <= 35) return c - 10 + 'a';
+  if (36 <= c && c <= 61) return c - 36 + 'A';
+  return '\0';
+}
+
 int main (int argc, char *argv[]) {
   std::string output_filename = "result.txt";
   std::string input_filename;
+  size_t grid_dimension = 3;
+  size_t solution_count_limit = 0;
+
   if (argc == 1) {
     std::cout << "Usage: " << argv[0] << " <filename>" << std::endl;
-    std::cout << "    -o <filename> | specifices output file." << std::endl;
+    std::cout << "    -o <filename> | specifices the output file." << std::endl;
+    std::cout << "    -c <integer>  | determines the limit on the number of solutions." << std::endl;
+    std::cout << "    -d <integer>  | determines the dimension of the sudoku." << std::endl;
     return 0;
   }
 
@@ -132,9 +152,10 @@ int main (int argc, char *argv[]) {
       continue;
     }
 
-    // TODO: Check is there is one more paramater for flag.
     switch (argv[i][1]) {
       case 'o': output_filename = argv[++i]; break;
+      case 'd': grid_dimension = atoi(argv[++i]); break;
+      case 'c': solution_count_limit = atoi(argv[++i]); break;
 
       default:
         std::cout << "Unexpected flag '" << argv[i][0] << "'. Run '" << argv[0] << "' for help." << std::endl;
@@ -143,33 +164,50 @@ int main (int argc, char *argv[]) {
 
   }
 
+  size_t grid_dimension_sq = grid_dimension * grid_dimension;
   std::ifstream input_file(input_filename);
   if (!input_file.good()) {
     std::cout << "Can't access file '" << input_filename << "'." << std::endl;
     return 0;
   }
 
-  size_t d = 3;
-  matrix<choice<cell>> grid = generate_choice_matrix(d);
+  matrix<choice<cell>> grid = generate_choice_matrix(grid_dimension);
   
-  for (int i = 0; i < d * d; i++)
-    for (int j = 0; j < d * d; j++) {
-      char c; input_file >> c;
-      if (c != '.') determine(grid, j, i, c - '1' + 1, d);
+  // read file
+  for (int i = 0; i < grid_dimension_sq; i++)
+    for (int j = 0; j < grid_dimension_sq; j++) {
+      char c;
+      if (!(input_file >> c)) {
+        std::cout << "Not enough characters in file!" << std::endl;
+        input_file.close();
+        return 0;
+      }
+      if (c == '.') continue;
+
+      cell parsed = parse_cell(c);
+      if (parsed == 0 || parsed > grid_dimension_sq) {
+        std::cout << "Unexpected character '" << c << "'." << std::endl;
+        input_file.close();
+        return 0;
+      }
+      determine(grid, j, i, parsed, grid_dimension);
     }
   input_file.close();
 
+  // finding solutions...
   auto begin_time = std::chrono::high_resolution_clock::now();
-  auto sols = solutions(grid, d);
+  auto solutions = get_solutions(grid, grid_dimension, solution_count_limit);
   auto end_time = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> calc_time = end_time - begin_time;
   
   // save to file
+
+  // TODO: remove redundant spaces and add a flag for removing them at all.
   std::ofstream output_file(output_filename);
-  for (auto &dd : sols) {
-    for (int i = 0; i < d*d; i++) {
-      for (int j = 0; j < d*d; j++)
-  	    output_file << dd[i][j] << ' ';
+  for (auto &dd : solutions) {
+    for (int i = 0; i < grid_dimension_sq; i++) {
+      for (int j = 0; j < grid_dimension_sq; j++)
+  	    output_file << write_cell(dd[i][j]) << ' ';
       output_file << std::endl;
     }
     output_file << std::endl;
@@ -177,7 +215,8 @@ int main (int argc, char *argv[]) {
   output_file.close();
 
   // logs
-  std::cout << "Found " << sols.size() << " solution(s) in "
-	    << calc_time.count() << " seconds." << std::endl;
+  std::cout << std::fixed << std::setprecision(4)
+            << "Found " << solutions.size() << " solution(s) in "
+	          << calc_time.count() << " seconds." << std::endl;
   return 0;
 }
