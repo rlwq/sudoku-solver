@@ -119,18 +119,20 @@ std::list<matrix<cell>> solutions(matrix<choice<cell>>& m, size_t d) {
 
 int main (int argc, char *argv[]) {
   std::string output_filename = "result.txt";
+  std::string input_filename;
   if (argc == 1) {
     std::cout << "Usage: " << argv[0] << " <filename>" << std::endl;
     std::cout << "    -o <filename> | specifices output file." << std::endl;
     return 0;
   }
 
-  for (size_t i = 2; i < argc; i++) {
+  for (size_t i = 1; i < argc; i++) {
     if (argv[i][0] != '-') {
-      std::cout << "Unexpected parameter '" << argv[i] << "'. Run '" << argv[0] << "' for help." << std::endl;
-      return 0;
+      input_filename = argv[i];
+      continue;
     }
 
+    // TODO: Check is there is one more paramater for flag.
     switch (argv[i][1]) {
       case 'o': output_filename = argv[++i]; break;
 
@@ -141,9 +143,9 @@ int main (int argc, char *argv[]) {
 
   }
 
-  std::ifstream input_file(argv[1]);
+  std::ifstream input_file(input_filename);
   if (!input_file.good()) {
-    std::cout << "Can't access file '" << argv[1] << "'." << std::endl;
+    std::cout << "Can't access file '" << input_filename << "'." << std::endl;
     return 0;
   }
 
@@ -163,16 +165,16 @@ int main (int argc, char *argv[]) {
   std::chrono::duration<double> calc_time = end_time - begin_time;
   
   // save to file
-  std::ofstream results(output_filename);
+  std::ofstream output_file(output_filename);
   for (auto &dd : sols) {
     for (int i = 0; i < d*d; i++) {
       for (int j = 0; j < d*d; j++)
-  	    results << dd[i][j] << ' ';
-      results << std::endl;
+  	    output_file << dd[i][j] << ' ';
+      output_file << std::endl;
     }
-    results << std::endl;
+    output_file << std::endl;
   }
-  results.close();
+  output_file.close();
 
   // logs
   std::cout << "Found " << sols.size() << " solution(s) in "
