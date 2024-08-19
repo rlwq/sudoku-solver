@@ -91,12 +91,19 @@ int grid_status(matrix<choice<cell>>& m) {
   return solved ? 1 : 0;
 }
 
-choice<matrix<choice<cell>>> determine_first(matrix<choice<cell>>& m, size_t d) {
+choice<matrix<choice<cell>>> determine_one(matrix<choice<cell>>& m, size_t d) {
+  size_t det_x, det_y, curr_size = SIZE_MAX;
+  bool found = false;
+
   for (size_t i = 0; i < d*d; i++)
     for (size_t j = 0; j < d*d; j++)
-      if (m[i][j].size() > 1)
-	return determine_cell(m, j, i, d);
-  return {};
+      if (m[i][j].size() > 1 && m[i][j].size() < curr_size) {
+        det_x = j; det_y = i;
+        curr_size = m[i][j].size();
+        found = true;
+      }
+  if (!found) return {};
+	return determine_cell(m, det_x, det_y, d);
 }
 
 std::list<matrix<cell>> get_solutions(matrix<choice<cell>>& m, size_t d, size_t solution_count_limit) {
@@ -110,7 +117,7 @@ std::list<matrix<cell>> get_solutions(matrix<choice<cell>>& m, size_t d, size_t 
     int status = grid_status(ch);
     if (status == 1) result.push_back(remove_choice(ch));
     else if (status == 0) {
-      auto dets = determine_first(ch, d);
+      auto dets = determine_one(ch, d);
       for (auto &det : dets) stack.push_back(det);
     }
   }
