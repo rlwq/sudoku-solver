@@ -3,8 +3,10 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "string.h"
+#include "assert.h"
 
 #define BLK(deg_, p_) ((p_).col / (deg_) + (p_).row / (deg_) * (deg_))
+#define CURR_EMPTY(s_) ((s_).empties[(s_).assigned_count])
 
 typedef struct {
     size_t row, col;
@@ -61,7 +63,7 @@ SudokuState *alloc_sudoku_state(size_t deg) {
     return state;
 }
 
-bool is_possible(const SudokuState state[static 1], FieldPos p, size_t v) {
+bool can_assign(const SudokuState state[static 1], FieldPos p, size_t v) {
     return state->rows_opts[p.row * state->deg2 + v] &&
         state->cols_opts[p.col * state->deg2 + v] &&
         state->blks_opts[BLK(state->deg, p) * state->deg2 + v];
@@ -86,15 +88,11 @@ size_t from_alphabet(char c, const char *alphabet) {
     return i;
 }
 
-size_t to_alphabet(size_t v, const char *alphabet) {
-    return alphabet[v];
-}
-
-void print_sudoku(const SudokuState state[static 1]) {
+void print_sudoku(const SudokuState state[static 1],
+                  const char alphabet[static state->deg2]) {
     for (size_t row = 0; row < state->deg2; row++) {
         for (size_t col = 0; col < state->deg2; col++) {
-            // TODO: rewrite this using to_alphabet();
-            printf("%zu ", state->field[row * state->deg2 + col] + 1);
+            printf("%c ", alphabet[state->field[row * state->deg2 + col]]);
         }
         printf("\n");
     }
@@ -103,53 +101,66 @@ void print_sudoku(const SudokuState state[static 1]) {
 
 void fill(SudokuState state[static 1]) {
     for (; state->assigned_count < state->empties_count; state->assigned_count++) {
-        bool can_assign = false;
+        bool assigned = false;
         for (size_t c = 0; c < state->deg2; c++) {
-            if (!is_possible(state, state->empties[state->assigned_count], c)) continue;
-            assign_value(state, state->empties[state->assigned_count], c);
-            can_assign = true;
+            if (!can_assign(state, CURR_EMPTY(*state), c)) continue;
+            assign_value(state, CURR_EMPTY(*state), c);
+            assigned = true;
             break;
         }
-        if (!can_assign) break;
+        if (!assigned) break;
     }
 }
 
 void iterate(SudokuState state[static 1]) {
+    assert(state->assigned_count > 0);
+
     bool assigned = true;
     do {
         assigned = false;
-        state->assigned_count--; //  TODO: unsafe
-        size_t row = state->empties[state->assigned_count].row,
-               col = state->empties[state->assigned_count].col;
+        state->assigned_count--;
+        size_t row = CURR_EMPTY(*state).row,
+               col = CURR_EMPTY(*state).col;
         size_t old_v = state->field[row * state->deg2 + col];
-        unassign_value(state, state->empties[state->assigned_count], old_v);
+        unassign_value(state, CURR_EMPTY(*state), old_v);
 
         for (size_t new_v = old_v + 1; new_v < state->deg2; new_v++) {
-            if (!is_possible(state, state->empties[state->assigned_count], new_v)) continue;
+            if (!can_assign(state, CURR_EMPTY(*state), new_v)) continue;
             assigned = true;
-            assign_value(state, state->empties[state->assigned_count], new_v);
+            assign_value(state, CURR_EMPTY(*state), new_v);
             state->assigned_count++;
             break; 
         }
     } while(!assigned && state->assigned_count > 0);
 }
 
-void search_solutions(SudokuState state[static 1]) {
+void search_solutions(SudokuState state[static 1],
+                      size_t limit,
+                      const char alphabet[static state->deg2]) {
+    size_t solutions_found = 0;
     do {
         fill(state);
-        if (state->assigned_count == state->empties_count) print_sudoku(state);
+        if (state->assigned_count == state->empties_count) {
+            print_sudoku(state, alphabet);
+            solutions_found++;
+        }
         iterate(state);
-    } while (state->assigned_count);
+    } while (state->assigned_count && (!limit || solutions_found < limit));
 }
 
+// TODO: replace arrays of bools with bitmasks
+// TODO: sort empty cells by the amount of possible values
+// TODO: -f (format)
+// TODO: assert if parsed char is not in alphabet or "Empty Cell Char" is in alphabet
+// TODO: assert if input is invalid
 int main(int argc, char **argv) {
     size_t deg = 3;
-    size_t max_solutions = 10;
+    size_t max_solutions = 0;
     char* alphabet = "123456789ABCDEFG";
     char empty_cell_char = '.'; 
     
     bool arg_err = false;
-    for (size_t i = 1; i < argc; i++) {
+    for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-d")) {
             if (++i >= argc) arg_err = true;
             else deg = atoi(argv[i]);  // TODO: use strtoul instead
@@ -161,6 +172,10 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "-m")) {
             if (++i >= argc) arg_err = true;
             else max_solutions = atoi(argv[i]);  // TODO: use strtoul instead
+        }
+        else if (!strcmp(argv[i], "-e")) {
+            if (++i >= argc) arg_err = true;
+            else empty_cell_char = argv[i][0];
         }
         else {
             arg_err = true;
@@ -190,7 +205,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    search_solutions(sudoku);
+    search_solutions(sudoku, max_solutions, alphabet);
     free_sudoku_state(sudoku);
     return 0;
 }
