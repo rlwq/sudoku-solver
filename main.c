@@ -8,6 +8,13 @@
 #define BLK(deg_, p_) ((p_).col / (deg_) + (p_).row / (deg_) * (deg_))
 #define CURR_EMPTY(s_) ((s_).empties[(s_).assigned_count])
 
+static const char *help_msg =
+    "USAGE: %s [OPTIONS]\n"
+    "    -d <int>     Sudoku degree (block size). A standard sudoku has a degree of 3. Default 3\n"
+    "    -m <int>     Maximum solutions to find. Use -m 0 to remove the limit. Default 0\n"
+    "    -e <char>    Character used to indicate an empty cell. Default '.'\n"
+    "    -a <string>  Characters used in the Sudoku board. Default \"123456789ABCDEFG\"\n";
+
 typedef struct {
     size_t row, col;
 } FieldPos;
@@ -148,11 +155,6 @@ void search_solutions(SudokuState state[static 1],
     } while (state->assigned_count && (!limit || solutions_found < limit));
 }
 
-// TODO: replace arrays of bools with bitmasks
-// TODO: sort empty cells by the amount of possible values
-// TODO: -f (format)
-// TODO: assert if parsed char is not in alphabet or "Empty Cell Char" is in alphabet
-// TODO: assert if input is invalid
 int main(int argc, char **argv) {
     size_t deg = 3;
     size_t max_solutions = 0;
@@ -163,7 +165,7 @@ int main(int argc, char **argv) {
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-d")) {
             if (++i >= argc) arg_err = true;
-            else deg = atoi(argv[i]);  // TODO: use strtoul instead
+            else deg = strtoul(argv[i], NULL, 10);
         } 
         else if (!strcmp(argv[i], "-a")) {
             if (++i >= argc) arg_err = true;
@@ -171,7 +173,7 @@ int main(int argc, char **argv) {
         }
         else if (!strcmp(argv[i], "-m")) {
             if (++i >= argc) arg_err = true;
-            else max_solutions = atoi(argv[i]);  // TODO: use strtoul instead
+            else max_solutions = strtoul(argv[i], NULL, 10);
         }
         else if (!strcmp(argv[i], "-e")) {
             if (++i >= argc) arg_err = true;
@@ -183,8 +185,10 @@ int main(int argc, char **argv) {
         }
     }
 
+    if (strlen(alphabet) < deg*deg) arg_err = true;
+
     if (arg_err) {
-        printf("USAGE: ...\n");
+        fprintf(stderr, help_msg, argv[0]);
         return 1;
     }
 
@@ -192,7 +196,8 @@ int main(int argc, char **argv) {
 
     if (!sudoku) return 1;
 
-    for (size_t row = 0; row < sudoku->deg2; row++) {
+    bool value_err = false; 
+    for (size_t row = 0; row < sudoku->deg2 && !value_err; row++) {
         for (size_t col = 0; col < sudoku->deg2; col++) {
             char c;
             scanf(" %c", &c);
@@ -200,9 +205,18 @@ int main(int argc, char **argv) {
                 sudoku->empties[sudoku->empties_count++] = (FieldPos) { .row = row, .col = col };
                 continue;
             }
-
-            assign_value(sudoku, (FieldPos) { .row = row, .col = col }, from_alphabet(c, alphabet));
+            size_t v = from_alphabet(c, alphabet);
+            if (v >= sudoku->deg2) {
+                value_err = true;
+                break;
+            }
+            assign_value(sudoku, (FieldPos) { .row = row, .col = col }, v);
         }
+    }
+
+    if (value_err) {
+        fprintf(stderr, "Input contains an unexpected character.\n");
+        return 1;
     }
 
     search_solutions(sudoku, max_solutions, alphabet);
